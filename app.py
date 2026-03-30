@@ -173,7 +173,7 @@ if st.button("🚀 Recomendar"):
 
         poster = get_poster(titulo)
 
-        col = cols[i % 5]
+        col = col[i % 5]
 
         with col:
 
