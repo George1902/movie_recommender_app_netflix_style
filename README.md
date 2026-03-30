@@ -1,43 +1,63 @@
-# 🍿 Movie Recommender AI - Netflix Style
+# 🍿 Movie Recommender AI - Evolution (Netflix Style)
 
-![Python](https://img.shields.io/badge/Python-3.10-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.32-red)
-![Machine Learning](https://img.shields.io/badge/ML-Content--Based-green)
+Esta aplicación es la versión orientada a producto del sistema de recomendación desarrollado originalmente en el proyecto [Movie Recommender AI V1](https://github.com/TU_USUARIO/PROYECTO_ANTERIOR). Mientras que la V1 se centró en la experimentación con algoritmos (SVD, TF-IDF), esta versión se enfoca en la **escalabilidad, persistencia y UI/UX de alto nivel**.
 
-Esta aplicación es un sistema de recomendación de películas con una interfaz moderna inspirada en Netflix. Utiliza **Machine Learning** para sugerir títulos basados en la similitud de contenido y se integra con la API de **TMDB** para ofrecer una experiencia visual enriquecida con pósters, sinopsis y tráilers oficiales.
-
-🚀 **App en vivo:** [Tu Enlace de Streamlit](https://movierecommenderappnetflixstyle-geroge-1902.streamlit.app/)
+🚀 **Demo en vivo:** [Probar la App aquí](https://movierecommenderappnetflixstyle-geroge-1902.streamlit.app/)
 
 ---
 
-## 🛠️ Arquitectura del Proyecto
+## 🧠 De la Experimentación al Producto (V1 vs V2)
 
-El sistema funciona mediante un flujo de tres capas:
+Este proyecto representa un salto técnico desde un entorno de análisis (Jupyter) hacia una aplicación web funcional:
 
-1.  **Capa de Datos (Local):** Uso de un dataset de películas (`peliculas.csv`) preprocesado.
-2.  **Capa de Inteligencia (ML):** Los modelos (`similitud.pkl` e `indices.pkl`) calculan la **Similitud del Coseno** entre vectores de características (géneros, palabras clave, etc.).
-3.  **Capa de Presentación (API + UI):** Streamlit actúa como frontend, consultando la API de **The Movie Database (TMDB)** en tiempo real para obtener metadatos multimedia.
-
-
-
-[Image of Content-based filtering recommendation system diagram]
-
-
----
-
-## ✨ Características
-
-* **Motor de Recomendación:** Basado en contenido (Content-Based Filtering).
-* **Interfaz Interactiva:** Diseño responsive con efectos *hover* tipo tarjeta.
-* **Detalles Extendidos:** Ventanas modales con director, reparto y puntuación.
-* **Multimedia:** Reproducción de tráilers de YouTube directamente en la app.
-* **Filtros Inteligentes:** Capacidad de filtrar las recomendaciones por género.
+| Característica | Versión Anterior (V1) | Versión Actual (V2) |
+| :--- | :--- | :--- |
+| **Enfoque** | Análisis y Evaluación (SVD/TF-IDF) | Producción y UX (Content-Based) |
+| **Interfaz** | Básica / Experimental | Estilo Netflix (Hover Effects & Cards) |
+| **Multimedia** | Solo Pósters | **Tráilers de YouTube**, Reparto y Director |
+| **Persistencia** | Recarga de página estándar | **Streamlit Session State** para navegación fluida |
+| **Arquitectura** | Ejecución en Notebook | Modular (Models + Data + App) |
 
 ---
 
-## 💻 Instalación y Uso Local
+## 🛠️ Arquitectura y Tecnologías
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [https://github.com/TU_USUARIO/TU_REPOSITORIO.git](https://github.com/TU_USUARIO/TU_REPOSITORIO.git)
-   cd TU_REPOSITORIO
+El motor de recomendación utiliza **Similitud del Coseno** calculada sobre vectores de características extraídos del dataset **MovieLens**.
+
+### Stack Tecnológico:
+* **Frontend:** Streamlit (Custom CSS para Look & Feel de Netflix).
+* **Machine Learning:** Scikit-Learn (Matriz de similitud).
+* **API:** The Movie Database (TMDB) para metadatos dinámicos.
+* **Serialización:** Pickle/Joblib para carga rápida de modelos de 20MB+.
+
+---
+
+## ✨ Nuevas Funcionalidades
+
+* **Ventanas Modales (Modals):** Implementación de `st.dialog` para ver detalles sin perder el contexto de búsqueda.
+* **Reproductor de Tráiler:** Integración nativa de videos de YouTube.
+* **Buscador con Autocompletado:** Filtrado rápido por título y género simultáneamente.
+* **Diseño Visual:** Tarjetas con efectos de escala y superposición de información (Rating, Sinopsis).
+
+---
+
+## 📁 Estructura del Repositorio
+
+```text
+├── app.py              # Aplicación principal
+├── data/
+│   └── peliculas.csv   # Dataset procesado
+├── assets              # Visualización app anterior
+├── models/
+│   ├── similitud.pkl   # Matriz de similitud (21.5 MB)
+│   └── indices.pkl     # Mapeo de IDs de películas
+├── requirements.txt    # Dependencias del proyecto
+└── README.md           # Documentación
+
+👨‍💻 Autor
+
+Jorge Ojeda Oracle Next Education (ONE) — Alura LATAM 📅 2026
+
+📄 Licencia
+
+Proyecto de uso educativo. Datos proporcionados por MovieLens. Pósters obtenidos vía TMDB API.
