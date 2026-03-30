@@ -28,27 +28,24 @@ df_peliculas, similitud, indices = load_data()
 # ---------------- TMDB ----------------
 API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
 
-def get_poster(title):
+def get_movie_details(title):
     try:
         title = title.split('(')[0]
-
         url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title}"
         response = requests.get(url)
-
-        if response.status_code != 200:
-            return None
-
-        data = response.json()
-
-        if data.get("results"):
-            poster_path = data["results"][0].get("poster_path")
-            if poster_path:
-                return f"https://image.tmdb.org/t/p/w500{poster_path}"
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results"):
+                movie_data = data["results"][0]
+                poster_path = movie_data.get("poster_path")
+                vote_average = movie_data.get("vote_average", 0) # Obtenemos la nota
+                
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                return poster_url, vote_average
     except:
-        return None
-
-    return None
-
+        return None, 0
+    return None, 0
+    
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
     idx = indices[movie_id]
@@ -166,32 +163,21 @@ def recomendar(movie_id, top_n=15):
     return recs
 
 # ---------------- DENTRO DEL BOTON RECOMENDAR ----------------
-if st.button("🚀 Recomendar"):
-    if movie_name:
-        movie_id = df_peliculas[df_peliculas['titulo'] == movie_name]['movie_id'].values[0]
-        
-        # Obtenemos el DataFrame de recomendadas
-        df_recs = recomendar(movie_id)
 
-        st.subheader("🔥 Recomendaciones")
-        cols = st.columns(5) 
-        idx_col = 0 
-
-        for _, row in df_recs.iterrows():
+        for movie_id_rec in rec_ids:
+            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
             titulo = row['titulo']
-            
-            # --- CAMBIO AQUÍ: Usar la columna de calificación de tu CSV ---
-            # Si tu columna se llama diferente, cámbiala aquí (ej. row['vote_average'])
-            rating = row.get('puntuacion', 0) 
 
             if genero_select != "Todos":
                 if row[genero_select] != 1:
                     continue
 
-            poster = get_poster(titulo)
-            
-            with cols[idx_col % 5]:
-                # Estructura HTML con la estrella y la nota real
+            # Llamamos a la función actualizada
+            poster, rating = get_movie_details(titulo)
+
+            col = cols[idx_col % 5]
+
+            with col:
                 st.markdown(f"""
                 <div class="movie-container">
                     {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
