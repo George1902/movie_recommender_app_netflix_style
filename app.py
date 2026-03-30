@@ -52,11 +52,14 @@ def get_poster(title):
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
     idx = indices[movie_id]
+    # Calculamos similitudes
     scores = list(enumerate(similitud[idx]))
     scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
-
+    
     movie_indices = [i[0] for i in scores]
-    return df_peliculas.iloc[movie_indices]['movie_id'].values
+    
+    # Devolvemos el DataFrame con las películas recomendadas
+    return df_peliculas.iloc[movie_indices]
 
 # ---------------- CSS NETFLIX ----------------
 st.markdown("""
@@ -165,19 +168,21 @@ def recomendar(movie_id, top_n=15):
 # ---------------- DENTRO DEL BOTON RECOMENDAR ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
-        movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
-        movie_id = movie_selected['movie_id'].values[0]
-
-        df_recs = recomendar(movie_id) # Ahora devuelve un DataFrame con scores
+        movie_id = df_peliculas[df_peliculas['titulo'] == movie_name]['movie_id'].values[0]
+        
+        # Obtenemos el DataFrame de recomendadas
+        df_recs = recomendar(movie_id)
 
         st.subheader("🔥 Recomendaciones")
-        
         cols = st.columns(5) 
         idx_col = 0 
 
         for _, row in df_recs.iterrows():
             titulo = row['titulo']
-            score = row['similarity_score'] * 100 # Convertimos a porcentaje
+            
+            # --- CAMBIO AQUÍ: Usar la columna de calificación de tu CSV ---
+            # Si tu columna se llama diferente, cámbiala aquí (ej. row['vote_average'])
+            rating = row.get('puntuacion', 0) 
 
             if genero_select != "Todos":
                 if row[genero_select] != 1:
@@ -186,16 +191,15 @@ if st.button("🚀 Recomendar"):
             poster = get_poster(titulo)
             
             with cols[idx_col % 5]:
-                # Ahora usamos la variable 'score' que antes daba error
-                content = f"""
+                # Estructura HTML con la estrella y la nota real
+                st.markdown(f"""
                 <div class="movie-container">
                     {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
                     <div class="movie-overlay">
                         <div class="movie-title">{titulo[:30]}</div>
-                        <div class="movie-score">⭐ {round(score,2)}</div>
+                        <div class="movie-score">⭐ {round(rating, 1)}</div>
                     </div>
                 </div>
-                """
-                st.markdown(content, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
             
             idx_col += 1
