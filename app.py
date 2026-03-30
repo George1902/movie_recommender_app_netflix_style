@@ -151,21 +151,23 @@ genero_select = st.selectbox(
 # ---------------- BOTON ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
-        # 1. Obtener ID de la película seleccionada
         movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
         
         if movie_selected.empty:
             st.error("No se encontró la película.")
         else:
             movie_id = movie_selected['movie_id'].values[0]
-            rec_ids = recomendar(movie_id)
+            
+            # Aquí rec_ids es un DataFrame (según tu función recomendar)
+            df_recs = recomendar(movie_id)
 
             st.subheader("🔥 Recomendaciones")
             cols = st.columns(5) 
             idx_col = 0 
 
-            for movie_id_rec in rec_ids:
-                # Buscamos la película en el DataFrame
+            # IMPORTANTE: Iteramos sobre los valores de la columna movie_id
+            for movie_id_rec in df_recs['movie_id'].values:
+                
                 datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
                 
                 if datos_pelicula.empty:
@@ -174,25 +176,15 @@ if st.button("🚀 Recomendar"):
                 row = datos_pelicula.iloc[0]
                 titulo = row['titulo']
 
-                # --- FILTRO DE GÉNERO SEGURO ---
+                # Filtro de género
                 if genero_select != "Todos":
-                    # Verificamos si la columna existe antes de filtrar
                     if genero_select in row.index:
                         if row[genero_select] != 1:
                             continue
-                    else:
-                        # Si la columna no existe (error de nombre), no filtramos para no bloquear
-                        pass
 
-                # 2. Intentar obtener detalles de TMDB
-                # Asegúrate de que esta función devuelva (poster, rating)
-                detalles = get_movie_details(titulo)
-                if detalles:
-                    poster, rating = detalles
-                else:
-                    poster, rating = None, 0
+                # Obtener detalles de TMDB
+                poster, rating = get_movie_details(titulo)
 
-                # 3. Dibujar en la columna
                 with cols[idx_col % 5]:
                     if poster:
                         st.markdown(f"""
@@ -216,8 +208,6 @@ if st.button("🚀 Recomendar"):
                         """, unsafe_allow_html=True)
                 
                 idx_col += 1
-                
-                # Opcional: Limitar a 15 para no saturar si idx_col crece mucho
                 if idx_col >= 15:
                     break
 
