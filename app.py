@@ -149,35 +149,67 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
-for movie_id_rec in rec_ids:
-            # 1. Intentar localizar la película de forma segura
+
+# ---------------- BOTON ----------------
+if st.button("🚀 Recomendar"):
+
+    if movie_name:
+        # 1. Obtener ID de la película seleccionada
+        movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
+        movie_id = movie_selected['movie_id'].values[0]
+
+        # 2. Obtener recomendaciones (Asegúrate de que se llame rec_ids)
+        rec_ids = recomendar(movie_id)
+
+        st.subheader("🔥 Recomendaciones")
+        
+        # 3. Crear columnas
+        cols = st.columns(5) 
+        
+        # Contador para distribuir en las 5 columnas
+        idx_col = 0 
+
+        # 4. Bucle principal (Aquí es donde daba el NameError)
+        for movie_id_rec in rec_ids:
+            
+            # Buscamos la película de forma segura
             datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
             
             if datos_pelicula.empty:
-                st.warning(f"ID {movie_id_rec} no encontrado en la base de datos.")
                 continue
-            
+                
             row = datos_pelicula.iloc[0]
             titulo = row['titulo']
 
-            # 2. Filtro de género
+            # Filtro de género
             if genero_select != "Todos":
                 if row[genero_select] != 1:
                     continue
 
-            # 3. Obtener detalles de la API
-            poster, rating = get_movie_details(titulo)
-
-            # 4. Mostrar en la columna correspondiente
+            # Obtener poster y rating de la función que definimos antes
+            # Si aún usas 'get_poster', cámbialo aquí o usa la versión con rating
+            poster, rating = get_movie_details(titulo) 
+            
             with cols[idx_col % 5]:
-                st.markdown(f"""
-                <div class="movie-container">
-                    {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
-                    <div class="movie-overlay">
-                        <div class="movie-title">{titulo[:30]}</div>
-                        <div class="movie-score">⭐ {round(rating, 1)}</div>
+                if poster:
+                    st.markdown(f"""
+                    <div class="movie-container">
+                        <img src="{poster}" class="movie-img"/>
+                        <div class="movie-overlay">
+                            <div class="movie-title">{titulo[:30]}</div>
+                            <div class="movie-score">⭐ {round(rating, 1)}</div>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="movie-container">
+                        <div class="no-image">🎬</div>
+                        <div class="movie-overlay">
+                            <div class="movie-title">{titulo[:30]}</div>
+                            <div class="movie-score">⭐ {round(rating, 1)}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             idx_col += 1
