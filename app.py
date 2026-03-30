@@ -148,53 +148,54 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
+# ---------------- BOTON ----------------
 if st.button("🚀 Recomendar"):
-
     if movie_name:
+        # 1. Obtener ID de la película seleccionada
+        movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
+        movie_id = movie_selected['movie_id'].values[0]
 
-        movie_id = df_peliculas[
-            df_peliculas['titulo'] == movie_name
-        ]['movie_id'].values[0]
-
-        recs = recomendar(movie_id)
+        # 2. Obtener recomendaciones
+        rec_ids = recomendar(movie_id)
 
         st.subheader("🔥 Recomendaciones")
+        
+        # 3. CREAR COLUMNAS (Importante para evitar el error de 'cols')
+        cols = st.columns(5) 
+        
+        # Contador para distribuir en las 5 columnas
+        idx_col = 0 
 
-        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-
-        for movie_id_rec in recs:
-
+        for movie_id_rec in rec_ids:
             row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
             titulo = row['titulo']
 
+            # Filtro de género
             if genero_select != "Todos":
                 if row[genero_select] != 1:
                     continue
 
-        poster = get_poster(titulo)
-
-        col = col[i % 5]
-
-        with col:
-
-            if poster:
-                st.markdown(f"""
-                <div class="movie-container">
-                    <img src="{poster}" class="movie-img"/>
-                    <div class="movie-overlay">
-                        <div class="movie-title">{titulo[:30]}</div>
-                        <div class="movie-score">⭐ {round(score,2)}</div>
+            poster = get_poster(titulo)
+            
+            # Seleccionar la columna actual
+            with cols[idx_col % 5]:
+                if poster:
+                    st.markdown(f"""
+                    <div class="movie-container">
+                        <img src="{poster}" class="movie-img"/>
+                        <div class="movie-overlay">
+                            <div class="movie-title">{titulo[:30]}</div>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            else:
-                st.markdown(f"""
-                <div class="movie-container">
-                    <div class="no-image">🎬</div>
-                    <div class="movie-overlay">
-                        <div class="movie-title">{titulo[:30]}</div>
-                        <div class="movie-score">⭐ {round(score,2)}</div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="movie-container">
+                        <div class="no-image">🎬</div>
+                        <div class="movie-overlay">
+                            <div class="movie-title">{titulo[:30]}</div>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+            
+            idx_col += 1 # Incrementar solo si la película pasó el filtro
