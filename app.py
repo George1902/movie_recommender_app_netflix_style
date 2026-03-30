@@ -27,24 +27,26 @@ df_peliculas, similitud, indices = load_data()
 # ---------------- TMDB ----------------
 API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
 
-@st.cache_data
-def get_movie_data(title):
+def get_poster(title):
     try:
+        title = title.split('(')[0]
+
         url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title}"
-        data = requests.get(url).json()
+        response = requests.get(url)
 
-        if data["results"]:
-            movie = data["results"][0]
+        if response.status_code != 200:
+            return None
 
-            poster = "https://image.tmdb.org/t/p/w500" + movie["poster_path"] if movie["poster_path"] else ""
-            overview = movie["overview"]
+        data = response.json()
 
-            return {
-                "poster": poster,
-                "overview": overview
-            }
+        if data.get("results"):
+            poster_path = data["results"][0].get("poster_path")
+            if poster_path:
+                return f"https://image.tmdb.org/t/p/w500{poster_path}"
     except:
         return None
+
+    return None
 
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
