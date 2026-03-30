@@ -164,15 +164,13 @@ def recomendar(movie_id, top_n=15):
 
 # ---------------- DENTRO DEL BOTON RECOMENDAR ----------------
 
-# ... (dentro de st.button("🚀 Recomendar")) ...
+        for movie_id_rec in rec_ids:
+            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
+            titulo = row['titulo']
 
-for movie_id_rec in rec_ids:
-    row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
-    titulo = row['titulo']
-
-    if genero_select != "Todos":
-        if row[genero_select] != 1:
-            continue
+            if genero_select != "Todos":
+                if row[genero_select] != 1:
+                    continue
 
             # Llamamos a la función actualizada
             poster, rating = get_movie_details(titulo)
