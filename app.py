@@ -14,6 +14,7 @@ st.set_page_config(
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
+    # Asegúrate de que la ruta sea correcta según tu estructura de carpetas
     df = pd.read_csv("data/peliculas.csv")
 
     with open("models/similitud.pkl", "rb") as f:
@@ -26,214 +27,209 @@ def load_data():
 
 df_peliculas, similitud, indices = load_data()
 
-# ---------------- TMDB ----------------
+# ---------------- TMDB API ----------------
 API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
 
-def get_movie_details(title):
+def get_movie_full_details(title):
     try:
-        # Limpiamos el título para mejor búsqueda
-        title_clean = title.split('(')[0]
-        # Añadimos &language=es-ES para obtener la descripción en español
-        url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title_clean}&language=es-ES"
-        response = requests.get(url)
+        title_clean = title.split('(')[0].strip()
+        # 1. Buscar la película básica
+        search_url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title_clean}&language=es-ES"
+        res = requests.get(search_url).json()
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("results"):
-                movie_data = data["results"][0]
-                poster_path = movie_data.get("poster_path")
-                vote_average = movie_data.get("vote_average", 0)
-                overview = movie_data.get("overview", "Sin descripción disponible.")
-                
-                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-                return poster_url, vote_average, overview
+        if res.get("results"):
+            movie_data = res["results"][0]
+            m_id = movie_data["id"]
+            
+            # 2. Obtener detalles extendidos (Videos y Créditos)
+            detail_url = f"https://api.themoviedb.org/3/movie/{m_id}?api_key={API_KEY}&append_to_response=videos,credits&language=es-ES"
+            details = requests.get(detail_url).json()
+            
+            # Extraer Tráiler de YouTube
+            trailer_url = None
+            videos = details.get("videos", {}).get("results", [])
+            for v in videos:
+                if v["site"] == "YouTube" and (v["type"] == "Trailer" or v["type"] == "Teaser"):
+                    trailer_url = f"https://www.youtube.com/watch?v={v['key']}"
+                    break
+            
+            # Extraer Director y Actores
+            crew = details.get("credits", {}).get("crew", [])
+            director = next((m["name"] for m in crew if m["job"] == "Director"), "Desconocido")
+            
+            cast = details.get("credits", {}).get("cast", [])
+            actores = ", ".join([m["name"] for m in cast[:5]]) # Top 5 actores
+            
+            return {
+                "poster": f"https://image.tmdb.org/t/p/w500{movie_data.get('poster_path')}",
+                "rating": movie_data.get("vote_average", 0),
+                "overview": movie_data.get("overview", "Sin descripción disponible."),
+                "year": movie_data.get("release_date", "")[:4],
+                "trailer": trailer_url,
+                "director": director,
+                "actores": actores
+            }
     except:
-        return None, 0, "No se pudo cargar la descripción."
-    return None, 0, "Sin descripción disponible."
+        return None
+    return None
 
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
     idx = indices[movie_id]
     scores = list(enumerate(similitud[idx]))
     scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
-    
     movie_indices = [i[0] for i in scores]
     return df_peliculas.iloc[movie_indices]
 
-# ---------------- CSS NETFLIX ----------------
+# ---------------- VENTANA MODAL (DETALLES) ----------------
+@st.dialog("Detalles de la Película", width="large")
+def mostrar_detalles(info, titulo):
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if info['poster']:
+            st.image(info['poster'], use_container_width=True)
+    with col2:
+        st.title(titulo)
+        st.write(f"**📅 Año:** {info['year']} | **⭐ Nota:** {round(info['rating']/2, 1)}/5")
+        st.write(f"**🎬 Director:** {info['director']}")
+        st.write(f"**👥 Reparto:** {info['actores']}")
+        st.write("---")
+        st.write("**Sinopsis:**")
+        st.write(info['overview'])
+        
+        if info['trailer']:
+            st.write("---")
+            st.write("**🎥 Tráiler Oficial:**")
+            st.video(info['trailer'])
+        else:
+            st.info("Tráiler no disponible en este momento.")
+
+# ---------------- CSS ESTILO NETFLIX ----------------
 st.markdown("""
 <style>
-/* CONTENEDOR */
 .movie-container {
     position: relative;
     overflow: hidden;
     border-radius: 12px;
-    cursor: pointer;
     background-color: #1c1c1c;
+    margin-bottom: 10px;
 }
-
-/* IMAGEN */
 .movie-img {
     width: 100%;
     border-radius: 12px;
     transition: transform 0.4s ease;
     display: block;
 }
-
-/* ZOOM */
 .movie-container:hover .movie-img {
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
-
-/* OVERLAY */
 .movie-overlay {
     position: absolute;
     bottom: 0;
     width: 100%;
     height: 100%;
     padding: 15px;
-    background: linear-gradient(to top, rgba(0,0,0,1) 30%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(to top, rgba(0,0,0,1) 20%, rgba(0,0,0,0) 80%);
     opacity: 0;
     transition: opacity 0.3s ease;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
 }
-
-/* MOSTRAR OVERLAY */
 .movie-container:hover .movie-overlay {
     opacity: 1;
 }
-
-/* TITULO */
-.movie-title {
+.movie-title-card {
     color: white;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
-    line-height: 1.2;
     margin-bottom: 5px;
 }
-
-/* SCORE */
-.movie-score {
-    color: #FFD700;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 8px;
-}
-
-/* DESCRIPCIÓN */
-.movie-desc {
-    color: #d1d1d1;
-    font-size: 11px;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* PLACEHOLDER */
-.no-image {
-    height: 350px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #1c1c1c;
+/* Estilo para los botones Ver Más */
+.stButton>button {
+    width: 100%;
+    background-color: #e50914;
     color: white;
-    font-size: 30px;
-    border-radius: 12px;
+    border: none;
+    border-radius: 4px;
+}
+.stButton>button:hover {
+    background-color: #b20710;
+    color: white;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 style='text-align:center;'>🍿 Movie Recommender AI</h1>", unsafe_allow_html=True)
 
-# ---------------- UI ----------------
+# ---------------- UI PRINCIPAL ----------------
 st.title("🎬 Películas")
 
-# Buscador
-movie_name = st.selectbox(
-    "🔎 Buscar película",
-    df_peliculas['titulo'].sort_values(),
-    index=None,
-    placeholder="Escribe para buscar..."
-)
+col_search, col_genre = st.columns(2)
 
-# Géneros
-generos = df_peliculas.columns[2:]
+with col_search:
+    movie_name = st.selectbox(
+        "🔎 Buscar película",
+        df_peliculas['titulo'].sort_values(),
+        index=None,
+        placeholder="Escribe para buscar..."
+    )
 
-genero_select = st.selectbox(
-    "🎭 Filtrar por género",
-    ["Todos"] + list(generos)
-)
+with col_genre:
+    generos_cols = df_peliculas.columns[2:]
+    genero_select = st.selectbox(
+        "🎭 Filtrar por género",
+        ["Todos"] + list(generos_cols)
+    )
 
-# ---------------- BOTON ----------------
+# ---------------- LÓGICA DE RECOMENDACIÓN ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
         movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
         
-        if movie_selected.empty:
-            st.error("No se encontró la película.")
-        else:
+        if not movie_selected.empty:
             movie_id = movie_selected['movie_id'].values[0]
-            
-            # 2. Obtener el DataFrame de recomendaciones
             df_recs = recomendar(movie_id)
 
-            st.subheader("🔥 Recomendaciones para ti")
-            cols = st.columns(5) 
-            idx_col = 0 
+            st.subheader(f"🔥 Si te gustó '{movie_name}', te recomendamos:")
+            
+            # Crear cuadrícula de 5 columnas
+            idx_col = 0
+            cols = st.columns(5)
 
-            # 3. Bucle principal
             for movie_id_rec in df_recs['movie_id'].values:
-                
-                datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
-                
-                if datos_pelicula.empty:
+                datos = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
+                titulo_rec = datos['titulo']
+
+                # Filtro de género
+                if genero_select != "Todos" and datos[genero_select] != 1:
                     continue
-                
-                row = datos_pelicula.iloc[0]
-                titulo = row['titulo']
 
-                # --- FILTRO DE GÉNERO ---
-                if genero_select != "Todos":
-                    if genero_select in row.index:
-                        if row[genero_select] != 1:
-                            continue
+                # Obtener info completa de la API
+                info = get_movie_full_details(titulo_rec)
 
-                # 4. Obtener detalles de TMDB
-                poster, rating, overview = get_movie_details(titulo)
-
-                # --- LÓGICA DE 5 ESTRELLAS ---
-                rating_5 = rating / 2
-                num_stars = int(round(rating_5))
-                stars_html = "★" * num_stars
-                stars_empty_html = "☆" * (5 - num_stars)
-
-                # 5. Dibujar en la columna correspondiente
-                with cols[idx_col % 5]:
-                    # Preparamos el HTML
-                    img_html = f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'
-                    
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        {img_html}
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo}</div>
-                            <div class="movie-score">
-                                {stars_html}{stars_empty_html} 
-                                <span style="color: white; font-size: 11px; margin-left: 5px;">{round(rating_5, 1)}</span>
+                if info:
+                    with cols[idx_col % 5]:
+                        # Card visual
+                        st.markdown(f"""
+                        <div class="movie-container">
+                            <img src="{info['poster']}" class="movie-img"/>
+                            <div class="movie-overlay">
+                                <div class="movie-title-card">{titulo_rec[:40]}</div>
                             </div>
-                            <div class="movie-desc">{overview}</div>
                         </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
+                        
+                        # Botón de detalles (usa el session_state implícito de st.dialog)
+                        if st.button(f"ℹ️ Ver más", key=f"details_{movie_id_rec}"):
+                            mostrar_detalles(info, titulo_rec)
+                        
+                    idx_col += 1
                 
-                idx_col += 1
-                
-                if idx_col >= 15:
+                if idx_col >= 15: # Límite de resultados
                     break
 
             if idx_col == 0:
-                st.info(f"No se encontraron recomendaciones del género '{genero_select}' para esta película.")
+                st.info(f"No hay recomendaciones de '{genero_select}' para esta película.")
+    else:
+        st.warning("Por favor, selecciona una película primero.")
