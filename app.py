@@ -149,57 +149,35 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
-if st.button("🚀 Recomendar"):
-    if movie_name:
-        # 1. Obtener ID de la película seleccionada
-        movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
-        movie_id = movie_selected['movie_id'].values[0]
-
-        # 2. Obtener recomendaciones
-        rec_ids = recomendar(movie_id)
-
-        st.subheader("🔥 Recomendaciones")
-        
-        # 3. CREAR COLUMNAS
-        cols = st.columns(5) 
-        
-        # Contador para distribuir en las 5 columnas
-        idx_col = 0 
-
-    
-        for movie_id_rec in rec_ids:
-            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
+for movie_id_rec in rec_ids:
+            # 1. Intentar localizar la película de forma segura
+            datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
+            
+            if datos_pelicula.empty:
+                st.warning(f"ID {movie_id_rec} no encontrado en la base de datos.")
+                continue
+            
+            row = datos_pelicula.iloc[0]
             titulo = row['titulo']
 
-            # Filtro de género
+            # 2. Filtro de género
             if genero_select != "Todos":
                 if row[genero_select] != 1:
                     continue
 
-            # Usamos la función para obtener poster y score de TMDB
+            # 3. Obtener detalles de la API
             poster, rating = get_movie_details(titulo)
-            
-            # Seleccionar la columna actual (0, 1, 2, 3 o 4)
+
+            # 4. Mostrar en la columna correspondiente
             with cols[idx_col % 5]:
-                if poster:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <img src="{poster}" class="movie-img"/>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                            <div class="movie-score">⭐ {round(rating, 1)}</div>
-                        </div>
+                st.markdown(f"""
+                <div class="movie-container">
+                    {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
+                    <div class="movie-overlay">
+                        <div class="movie-title">{titulo[:30]}</div>
+                        <div class="movie-score">⭐ {round(rating, 1)}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <div class="no-image">🎬</div>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                            <div class="movie-score">⭐ {round(rating, 1)}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
             
-            idx_col += 1 # Solo aumenta si la película se mostró (pasó el filtro)
+            idx_col += 1
