@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib  # Usamos joblib por ser más estable que pickle
 import requests
 import os
 
@@ -12,21 +12,34 @@ st.set_page_config(
 )
 
 # ---------------- LOAD DATA ----------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("data/peliculas.csv")
-    with open("models/similitud.pkl", "rb") as f:
-        similitud = pickle.load(f)
-    with open("models/indices.pkl", "rb") as f:
-        indices = pickle.load(f)
-    return df, similitud, indices
+@st.cache_resource # Usamos resource para objetos pesados como modelos
+def load_models():
+    # Intentamos cargar con joblib (asegúrate de haber guardado tus modelos así o re-intenta con pickle si fallan)
+    try:
+        import pickle
+        with open("models/similitud.pkl", "rb") as f:
+            similitud = pickle.load(f)
+        with open("models/indices.pkl", "rb") as f:
+            indices = pickle.load(f)
+    except Exception as e:
+        st.error(f"Error al cargar los modelos (.pkl): {e}")
+        return None, None
+    return similitud, indices
 
-df_peliculas, similitud, indices = load_data()
+@st.cache_data
+def load_csv():
+    return pd.read_csv("data/peliculas.csv")
+
+# Carga de datos inicial
+df_peliculas = load_csv()
+similitud, indices = load_models()
 
 # ---------------- TMDB API ----------------
 API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
 
 def get_movie_full_details(title):
+    if not API_KEY:
+        return None
     try:
         title_clean = title.split('(')[0].strip()
         search_url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title_clean}&language=es-ES"
@@ -63,6 +76,8 @@ def get_movie_full_details(title):
 
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
+    if movie_id not in indices:
+        return pd.DataFrame()
     idx = indices[movie_id]
     scores = list(enumerate(similitud[idx]))
     scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
@@ -96,12 +111,14 @@ st.markdown("""
     overflow: hidden;
     border-radius: 12px;
     background-color: #1c1c1c;
+    aspect-ratio: 2/3;
 }
 .movie-img {
     width: 100%;
+    height: 100%;
+    object-fit: cover;
     border-radius: 12px;
     transition: transform 0.4s ease;
-    display: block;
 }
 .movie-container:hover .movie-img {
     transform: scale(1.1);
@@ -112,48 +129,42 @@ st.markdown("""
     width: 100%;
     height: 100%;
     padding: 15px;
-    background: linear-gradient(to top, rgba(0,0,0,1) 10%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(to top, rgba(0,0,0,1) 15%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0) 100%);
     opacity: 0;
     transition: opacity 0.3s ease;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    pointer-events: none; /* Permite que el clic pase al botón de abajo */
+    pointer-events: none;
 }
 .movie-container:hover .movie-overlay {
     opacity: 1;
 }
 .movie-title-card {
     color: white;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     margin-bottom: 5px;
 }
 .movie-desc-card {
     color: #ccc;
-    font-size: 11px;
+    font-size: 10px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    margin-top: 5px;
 }
-/* Estilo del botón Recomendar (Original) */
-div.stButton > button:first-child {
-    background-color: #1c1c1c;
+div.stButton > button {
+    background-color: #333;
     color: white;
-    border: 1px solid #333;
-}
-/* Estilo invisible para el botón Ver Más sobre la imagen */
-.overlay-button {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
-    height: 100%;
-    background: transparent;
     border: none;
-    cursor: pointer;
-    z-index: 10;
+    margin-top: 5px;
+}
+div.stButton > button:hover {
+    background-color: #e50914;
+    color: white;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -162,43 +173,46 @@ st.markdown("<h1 style='text-align:center;'>🍿 Movie Recommender AI</h1>", uns
 
 # ---------------- UI ----------------
 st.title("🎬 Películas")
-col1, col2 = st.columns(2)
-with col1:
+c1, c2 = st.columns(2)
+with c1:
     movie_name = st.selectbox("🔎 Buscar película", df_peliculas['titulo'].sort_values(), index=None)
-with col2:
-    genero_select = st.selectbox("🎭 Género", ["Todos"] + list(df_peliculas.columns[2:]))
+with c2:
+    genero_select = st.selectbox("🎭 Filtrar Género", ["Todos"] + list(df_peliculas.columns[2:]))
 
 if st.button("🚀 Recomendar"):
-    if movie_name:
+    if movie_name and similitud is not None:
         movie_id = df_peliculas[df_peliculas['titulo'] == movie_name]['movie_id'].values[0]
         df_recs = recomendar(movie_id)
         
-        st.subheader("🔥 Recomendaciones")
-        cols = st.columns(5)
-        idx_col = 0
-        
-        for movie_id_rec in df_recs['movie_id'].values:
-            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
-            if genero_select != "Todos" and row[genero_select] != 1:
-                continue
+        if not df_recs.empty:
+            st.subheader("🔥 Recomendaciones")
+            cols = st.columns(5)
+            idx_col = 0
             
-            info = get_movie_full_details(row['titulo'])
-            if info:
-                with cols[idx_col % 5]:
-                    # Contenedor Visual
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <img src="{info['poster']}" class="movie-img"/>
-                        <div class="movie-overlay">
-                            <div class="movie-title-card">{row['titulo'][:30]}</div>
-                            <div class="movie-score" style="color:#FFD700">★ {round(info['rating']/2,1)}</div>
-                            <div class="movie-desc-card">{info['overview']}</div>
+            for _, row in df_recs.iterrows():
+                if genero_select != "Todos" and row[genero_select] != 1:
+                    continue
+                
+                info = get_movie_full_details(row['titulo'])
+                if info:
+                    with cols[idx_col % 5]:
+                        st.markdown(f"""
+                        <div class="movie-container">
+                            <img src="{info['poster']}" class="movie-img"/>
+                            <div class="movie-overlay">
+                                <div class="movie-title-card">{row['titulo'][:30]}</div>
+                                <div class="movie-score" style="color:#FFD700">★ {round(info['rating']/2,1)}</div>
+                                <div class="movie-desc-card">{info['overview']}</div>
+                            </div>
                         </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # El botón ahora está debajo pero lo usaremos para disparar el modal
-                    if st.button(f"Ver detalle", key=f"btn_{movie_id_rec}"):
-                        mostrar_detalles(info, row['titulo'])
-                idx_col += 1
-            if idx_col >= 15: break
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button(f"Detalles", key=f"btn_{row['movie_id']}"):
+                            mostrar_detalles(info, row['titulo'])
+                    idx_col += 1
+                if idx_col >= 15: break
+            
+            if idx_col == 0:
+                st.info(f"No hay recomendaciones de {genero_select} para esta película.")
+    elif similitud is None:
+        st.error("Los modelos no están cargados. Revisa los archivos .pkl")
