@@ -150,7 +150,6 @@ genero_select = st.selectbox(
 
 # ---------------- BOTON ----------------
 
-# ---------------- BOTON ----------------
 if st.button("🚀 Recomendar"):
 
     if movie_name:
