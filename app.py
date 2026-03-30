@@ -127,7 +127,7 @@ st.markdown("""
 
 st.markdown("<h1 style='text-align:center;'>🍿 Movie Recommender AI</h1>", unsafe_allow_html=True)
 # ---------------- UI ----------------
-st.title("🎬 Movie Recommender AI")
+st.title("🎬 Movies")
 
 # Buscador
 movie_name = st.selectbox(
