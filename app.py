@@ -17,14 +17,12 @@ def load_models():
     path_similitud = "models/similitud.pkl"
     path_indices = "models/indices.pkl"
     
-    # Verificación de existencia
     if not os.path.exists(path_similitud):
         st.error(f"❌ No se encuentra el archivo en: {path_similitud}")
         return None, None
         
-    # Verificación de integridad (si es muy pequeño, está corrupto)
     if os.path.getsize(path_similitud) < 100:
-        st.error("❌ El archivo similitud.pkl en GitHub parece estar vacío o corrupto (Git LFS error).")
+        st.error("❌ El archivo similitud.pkl en GitHub parece estar vacío o corrupto.")
         return None, None
 
     try:
@@ -33,8 +31,6 @@ def load_models():
         with open(path_indices, "rb") as f:
             indices = pickle.load(f)
         return similitud, indices
-    except EOFError:
-        st.error("❌ Error 'Ran out of input': El archivo .pkl se subió incompleto. Intenta subirlo manualmente a GitHub.")
     except Exception as e:
         st.error(f"❌ Error al cargar modelos: {e}")
     
@@ -44,7 +40,6 @@ def load_models():
 def load_csv():
     return pd.read_csv("data/peliculas.csv")
 
-# Carga inicial
 df_peliculas = load_csv()
 similitud, indices = load_models()
 
@@ -62,13 +57,19 @@ def get_movie_full_details(title):
             movie_data = res["results"][0]
             m_id = movie_data["id"]
             
-            # Detalle extendido: videos y créditos
+            # Intentar obtener detalles y videos en ESPAÑOL
             detail_url = f"https://api.themoviedb.org/3/movie/{m_id}?api_key={API_KEY}&append_to_response=videos,credits&language=es-ES"
             details = requests.get(detail_url).json()
             
-            # Buscar Tráiler
             trailer_url = None
             videos = details.get("videos", {}).get("results", [])
+            
+            # Si no hay videos en español, intentamos en INGLÉS (respaldo)
+            if not videos:
+                detail_url_en = f"https://api.themoviedb.org/3/movie/{m_id}?api_key={API_KEY}&append_to_response=videos&language=en-US"
+                details_en = requests.get(detail_url_en).json()
+                videos = details_en.get("videos", {}).get("results", [])
+
             for v in videos:
                 if v["site"] == "YouTube" and v["type"] in ["Trailer", "Teaser"]:
                     trailer_url = f"https://www.youtube.com/watch?v={v['key']}"
@@ -113,10 +114,14 @@ def mostrar_detalles(info, titulo):
         st.write("---")
         st.write("**Sinopsis:**")
         st.write(info['overview'])
+        
+        # EL TRÁILER SE MUESTRA AQUÍ:
         if info['trailer']:
             st.write("---")
             st.write("**🎥 Tráiler Oficial:**")
             st.video(info['trailer'])
+        else:
+            st.info("Tráiler no disponible para esta película.")
 
 # ---------------- CSS ESTILO NETFLIX ----------------
 st.markdown("""
@@ -161,21 +166,12 @@ st.markdown("""
     font-size: 14px;
     font-weight: 700;
 }
-.movie-desc-card {
-    color: #ccc;
-    font-size: 10px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin-top: 5px;
-}
-/* Botón Recomendar Gris Original */
 div.stButton > button {
     background-color: #333;
     color: white;
     border: 1px solid #444;
     transition: all 0.3s;
+    width: 100%;
 }
 div.stButton > button:hover {
     border-color: #e50914;
@@ -194,7 +190,6 @@ with c1:
 with c2:
     genero_select = st.selectbox("🎭 Filtrar Género", ["Todos"] + list(df_peliculas.columns[2:]))
 
-# --- MANEJO DE SESIÓN PARA PERSISTENCIA ---
 if "recs_df" not in st.session_state:
     st.session_state.recs_df = None
 
@@ -203,45 +198,36 @@ if st.button("🚀 Recomendar"):
         selected_row = df_peliculas[df_peliculas['titulo'] == movie_name]
         if not selected_row.empty:
             m_id = selected_row['movie_id'].values[0]
-            # Guardamos en la sesión para que no se borre al abrir el modal
             st.session_state.recs_df = recomendar(m_id)
         else:
-            st.error("Película no encontrada en la base de datos.")
+            st.error("Película no encontrada.")
     elif similitud is None:
-        st.error("No se pueden generar recomendaciones porque los modelos no cargaron correctamente.")
+        st.error("Modelos no cargados.")
 
-# Mostrar recomendaciones si existen en la sesión
 if st.session_state.recs_df is not None:
     st.subheader(f"🔥 Recomendaciones")
     cols = st.columns(5)
     idx_col = 0
     
     for _, row in st.session_state.recs_df.iterrows():
-        # Filtro de género
         if genero_select != "Todos" and row[genero_select] != 1:
             continue
         
         info = get_movie_full_details(row['titulo'])
         if info:
             with cols[idx_col % 5]:
-                # Card de la película
                 st.markdown(f"""
                 <div class="movie-container">
                     <img src="{info['poster']}" class="movie-img"/>
                     <div class="movie-overlay">
                         <div class="movie-title-card">{row['titulo'][:30]}</div>
                         <div class="movie-score" style="color:#FFD700">★ {round(info['rating']/2,1)}</div>
-                        <div class="movie-desc-card">{info['overview']}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Botón de detalles (usa key única por movie_id)
                 if st.button(f"Detalles", key=f"det_{row['movie_id']}"):
                     mostrar_detalles(info, row['titulo'])
                 
                 idx_col += 1
         if idx_col >= 15: break
-
-    if idx_col == 0:
-        st.info("No hay recomendaciones que coincidan con ese género.")
