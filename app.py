@@ -171,7 +171,7 @@ if st.button("🚀 Recomendar"):
                 if row[genero_select] != 1:
                     continue
 
-            data =  get_poster(title)
+            data =  get_poster(title):
 
             poster = data["poster"] if data else ""
             overview = data["overview"][:120] if data else ""
