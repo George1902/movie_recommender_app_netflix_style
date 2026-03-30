@@ -10,6 +10,7 @@ st.set_page_config(
     page_icon="🍿",
     layout="wide"
 )
+
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
@@ -30,44 +31,45 @@ API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
 
 def get_movie_details(title):
     try:
-        title = title.split('(')[0]
-        url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title}"
+        # Limpiamos el título para mejor búsqueda
+        title_clean = title.split('(')[0]
+        # Añadimos &language=es-ES para obtener la descripción en español
+        url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title_clean}&language=es-ES"
         response = requests.get(url)
+        
         if response.status_code == 200:
             data = response.json()
             if data.get("results"):
                 movie_data = data["results"][0]
                 poster_path = movie_data.get("poster_path")
-                vote_average = movie_data.get("vote_average", 0) # Obtenemos la nota
+                vote_average = movie_data.get("vote_average", 0)
+                overview = movie_data.get("overview", "Sin descripción disponible.")
                 
                 poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-                return poster_url, vote_average
+                return poster_url, vote_average, overview
     except:
-        return None, 0
-    return None, 0
-    
+        return None, 0, "No se pudo cargar la descripción."
+    return None, 0, "Sin descripción disponible."
+
 # ---------------- RECOMENDADOR ----------------
 def recomendar(movie_id, top_n=15):
     idx = indices[movie_id]
-    # Calculamos similitudes
     scores = list(enumerate(similitud[idx]))
     scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
     
     movie_indices = [i[0] for i in scores]
-    
-    # Devolvemos el DataFrame con las películas recomendadas
     return df_peliculas.iloc[movie_indices]
 
 # ---------------- CSS NETFLIX ----------------
 st.markdown("""
 <style>
-
 /* CONTENEDOR */
 .movie-container {
     position: relative;
     overflow: hidden;
     border-radius: 12px;
     cursor: pointer;
+    background-color: #1c1c1c;
 }
 
 /* IMAGEN */
@@ -75,6 +77,7 @@ st.markdown("""
     width: 100%;
     border-radius: 12px;
     transition: transform 0.4s ease;
+    display: block;
 }
 
 /* ZOOM */
@@ -87,10 +90,14 @@ st.markdown("""
     position: absolute;
     bottom: 0;
     width: 100%;
-    padding: 10px;
-    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
+    height: 100%;
+    padding: 15px;
+    background: linear-gradient(to top, rgba(0,0,0,1) 30%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0) 100%);
     opacity: 0;
     transition: opacity 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
 
 /* MOSTRAR OVERLAY */
@@ -104,18 +111,31 @@ st.markdown("""
     font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
+    margin-bottom: 5px;
 }
 
 /* SCORE */
 .movie-score {
-    color: #e50914;
+    color: #FFD700;
     font-size: 14px;
     font-weight: 500;
+    margin-bottom: 8px;
+}
+
+/* DESCRIPCIÓN */
+.movie-desc {
+    color: #d1d1d1;
+    font-size: 11px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 /* PLACEHOLDER */
 .no-image {
-    height: 250px;
+    height: 350px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -124,13 +144,13 @@ st.markdown("""
     font-size: 30px;
     border-radius: 12px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 style='text-align:center;'>🍿 Movie Recommender AI</h1>", unsafe_allow_html=True)
+
 # ---------------- UI ----------------
-st.title("🎬 Movies")
+st.title("🎬 Películas")
 
 # Buscador
 movie_name = st.selectbox(
@@ -151,7 +171,6 @@ genero_select = st.selectbox(
 # ---------------- BOTON ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
-        # 1. Obtener ID de la película seleccionada
         movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
         
         if movie_selected.empty:
@@ -162,14 +181,13 @@ if st.button("🚀 Recomendar"):
             # 2. Obtener el DataFrame de recomendaciones
             df_recs = recomendar(movie_id)
 
-            st.subheader("🔥 Recomendaciones")
+            st.subheader("🔥 Recomendaciones para ti")
             cols = st.columns(5) 
             idx_col = 0 
 
-            # 3. Bucle principal (iteramos sobre los IDs de las recomendadas)
+            # 3. Bucle principal
             for movie_id_rec in df_recs['movie_id'].values:
                 
-                # Buscamos los datos de cada película recomendada en el CSV original
                 datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
                 
                 if datos_pelicula.empty:
@@ -184,49 +202,38 @@ if st.button("🚀 Recomendar"):
                         if row[genero_select] != 1:
                             continue
 
-                # 4. Obtener detalles de TMDB (Poster y Rating 0-10)
-                poster, rating = get_movie_details(titulo)
+                # 4. Obtener detalles de TMDB
+                poster, rating, overview = get_movie_details(titulo)
 
                 # --- LÓGICA DE 5 ESTRELLAS ---
-                rating_5 = rating / 2  # Convertimos escala 10 a escala 5
+                rating_5 = rating / 2
                 num_stars = int(round(rating_5))
                 stars_html = "★" * num_stars
                 stars_empty_html = "☆" * (5 - num_stars)
 
                 # 5. Dibujar en la columna correspondiente
                 with cols[idx_col % 5]:
-                    if poster:
-                        st.markdown(f"""
-                        <div class="movie-container">
-                            <img src="{poster}" class="movie-img"/>
-                            <div class="movie-overlay">
-                                <div class="movie-title">{titulo[:30]}</div>
-                                <div class="movie-score" style="color: #FFD700; font-size: 16px;">
-                                    {stars_html}{stars_empty_html} 
-                                    <span style="color: white; font-size: 12px;">({round(rating_5, 1)})</span>
-                                </div>
+                    # Preparamos el HTML
+                    img_html = f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'
+                    
+                    st.markdown(f"""
+                    <div class="movie-container">
+                        {img_html}
+                        <div class="movie-overlay">
+                            <div class="movie-title">{titulo}</div>
+                            <div class="movie-score">
+                                {stars_html}{stars_empty_html} 
+                                <span style="color: white; font-size: 11px; margin-left: 5px;">{round(rating_5, 1)}</span>
                             </div>
+                            <div class="movie-desc">{overview}</div>
                         </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="movie-container">
-                            <div class="no-image">🎬</div>
-                            <div class="movie-overlay">
-                                <div class="movie-title">{titulo[:30]}</div>
-                                <div class="movie-score" style="color: #FFD700; font-size: 16px;">
-                                    {stars_html}{stars_empty_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 idx_col += 1
                 
-                # Limitamos a 15 recomendaciones máximo
                 if idx_col >= 15:
                     break
 
-            # Si el filtro de género fue muy estricto y no dejó pasar nada
             if idx_col == 0:
-                st.info(f"No se encontraron recomendaciones de tipo '{genero_select}'.")
+                st.info(f"No se encontraron recomendaciones del género '{genero_select}' para esta película.")
