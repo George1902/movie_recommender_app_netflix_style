@@ -4,8 +4,10 @@ import pickle
 import requests
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="Movie Recommender", layout="wide")
-
+st.set_page_config(
+    page_title="Movie Recommender AI",
+    page_icon="🍿",
+    layout="wide"
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
@@ -55,60 +57,74 @@ def recomendar(movie_id, top_n=15):
 # ---------------- CSS NETFLIX ----------------
 st.markdown("""
 <style>
-body {
-    background-color: #0e1117;
-}
 
-.scroll-container {
-    display: flex;
-    overflow-x: auto;
-    gap: 15px;
-    padding: 10px;
-}
-
-.movie-card {
-    min-width: 180px;
+/* CONTENEDOR */
+.movie-container {
     position: relative;
+    overflow: hidden;
+    border-radius: 12px;
     cursor: pointer;
 }
 
+/* IMAGEN */
 .movie-img {
     width: 100%;
-    border-radius: 10px;
-    transition: transform 0.3s;
+    border-radius: 12px;
+    transition: transform 0.4s ease;
 }
 
-.movie-card:hover .movie-img {
+/* ZOOM */
+.movie-container:hover .movie-img {
     transform: scale(1.1);
 }
 
+/* OVERLAY */
 .movie-overlay {
     position: absolute;
     bottom: 0;
     width: 100%;
     padding: 10px;
-    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
     opacity: 0;
-    transition: 0.3s;
+    transition: opacity 0.3s ease;
 }
 
-.movie-card:hover .movie-overlay {
+/* MOSTRAR OVERLAY */
+.movie-container:hover .movie-overlay {
     opacity: 1;
 }
 
+/* TITULO */
 .movie-title {
     color: white;
-    font-size: 14px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
-.movie-desc {
-    color: #ccc;
-    font-size: 12px;
+/* SCORE */
+.movie-score {
+    color: #e50914;
+    font-size: 14px;
+    font-weight: 500;
 }
+
+/* PLACEHOLDER */
+.no-image {
+    height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #1c1c1c;
+    color: white;
+    font-size: 30px;
+    border-radius: 12px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("<h1 style='text-align:center;'>🍿 Movie Recommender AI</h1>", unsafe_allow_html=True)
 # ---------------- UI ----------------
 st.title("🎬 Movie Recommender AI")
 
