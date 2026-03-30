@@ -171,4 +171,3 @@ if st.button("🚀 Recomendar"):
 
     else:
         st.warning("⚠️ Selecciona una película")
-```
