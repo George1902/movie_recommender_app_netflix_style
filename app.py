@@ -149,21 +149,6 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
-def recomendar(movie_id, top_n=15):
-    idx = indices[movie_id]
-    scores = list(enumerate(similitud[idx]))
-    # Guardamos el score (distancia de similitud)
-    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
-    
-    movie_indices = [i[0] for i in scores]
-    movie_scores = [i[1] for i in scores] # Extraemos los valores de similitud
-    
-    recs = df_peliculas.iloc[movie_indices].copy()
-    recs['similarity_score'] = movie_scores
-    return recs
-
-# ---------------- DENTRO DEL BOTON RECOMENDAR ----------------
-# ---------------- BOTON ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
         # 1. Obtener ID de la película seleccionada
