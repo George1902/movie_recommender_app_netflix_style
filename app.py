@@ -192,7 +192,7 @@ if st.button("🚀 Recomendar"):
                     {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
                     <div class="movie-overlay">
                         <div class="movie-title">{titulo[:30]}</div>
-                        <div class="movie-score">⭐ {int(score)}% match</div>
+                        <div class="movie-score">⭐ {round(score,2)}</div>
                     </div>
                 </div>
                 """
