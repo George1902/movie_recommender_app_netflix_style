@@ -1,6 +1,6 @@
 # 🍿 Movie Recommender AI - Evolution (Netflix Style)
 
-Esta aplicación es la versión orientada a producto del sistema de recomendación desarrollado originalmente en el proyecto [Movie Recommender AI V1](https://github.com/TU_USUARIO/PROYECTO_ANTERIOR). Mientras que la V1 se centró en la experimentación con algoritmos (SVD, TF-IDF), esta versión se enfoca en la **escalabilidad, persistencia y UI/UX de alto nivel**.
+Esta aplicación es la versión orientada a producto del sistema de recomendación desarrollado originalmente en el proyecto [Movie Recommender AI V1](https://github.com/George1902/sistema_de_recomendacion_de_peliculas_app). Mientras que la V1 se centró en la experimentación con algoritmos (SVD, TF-IDF), esta versión se enfoca en la **escalabilidad, persistencia y UI/UX de alto nivel**.
 
 🚀 **Demo en vivo:** [Probar la App aquí](https://movierecommenderappnetflixstyle-geroge-1902.streamlit.app/)
 
