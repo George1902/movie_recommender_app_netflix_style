@@ -1,37 +1,85 @@
+```python
 import streamlit as st
 import pandas as pd
-import numpy as np
+import pickle
 import requests
-import os
 
-# -------------------------------
-# CONFIG
-# -------------------------------
-st.set_page_config(
-    page_title="Movie Recommender Netflix Style",
-    page_icon="🎬",
-    layout="wide"
-)
+# ---------------- CONFIG ----------------
+st.set_page_config(page_title="Movie Recommender", layout="wide")
 
-# -------------------------------
-# 🎨 ESTILO NETFLIX
-# -------------------------------
+# ---------------- LOAD DATA ----------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv("data/peliculas.csv")
+
+    with open("models/similitud.pkl", "rb") as f:
+        similitud = pickle.load(f)
+
+    with open("models/indices.pkl", "rb") as f:
+        indices = pickle.load(f)
+
+    return df, similitud, indices
+
+df_peliculas, similitud, indices = load_data()
+
+# ---------------- TMDB ----------------
+API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
+
+@st.cache_data
+def get_movie_data(title):
+    try:
+        url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title}"
+        data = requests.get(url).json()
+
+        if data["results"]:
+            movie = data["results"][0]
+
+            poster = "https://image.tmdb.org/t/p/w500" + movie["poster_path"] if movie["poster_path"] else ""
+            overview = movie["overview"]
+
+            return {
+                "poster": poster,
+                "overview": overview
+            }
+    except:
+        return None
+
+# ---------------- RECOMENDADOR ----------------
+def recomendar(movie_id, top_n=15):
+    idx = indices[movie_id]
+    scores = list(enumerate(similitud[idx]))
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+
+    movie_indices = [i[0] for i in scores]
+    return df_peliculas.iloc[movie_indices]['movie_id'].values
+
+# ---------------- CSS NETFLIX ----------------
 st.markdown("""
 <style>
-.movie-container {
+body {
+    background-color: #0e1117;
+}
+
+.scroll-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 15px;
+    padding: 10px;
+}
+
+.movie-card {
+    min-width: 180px;
     position: relative;
-    overflow: hidden;
-    border-radius: 12px;
     cursor: pointer;
 }
 
 .movie-img {
     width: 100%;
-    border-radius: 12px;
-    transition: transform 0.4s ease;
+    border-radius: 10px;
+    transition: transform 0.3s;
 }
 
-.movie-container:hover .movie-img {
+.movie-card:hover .movie-img {
     transform: scale(1.1);
 }
 
@@ -40,172 +88,88 @@ st.markdown("""
     bottom: 0;
     width: 100%;
     padding: 10px;
-    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: 0.3s;
 }
 
-.movie-container:hover .movie-overlay {
+.movie-card:hover .movie-overlay {
     opacity: 1;
 }
 
 .movie-title {
     color: white;
-    font-size: 16px;
-    font-weight: 700;
-}
-
-.movie-score {
-    color: #e50914;
     font-size: 14px;
+    font-weight: bold;
 }
 
-.no-image {
-    height: 250px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:#1c1c1c;
-    color:white;
-    border-radius:12px;
+.movie-desc {
+    color: #ccc;
+    font-size: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center;'>🎬 Netflix Style Recommender</h1>", unsafe_allow_html=True)
+# ---------------- UI ----------------
+st.title("🎬 Movie Recommender AI")
 
-# -------------------------------
-# 🔐 API
-# -------------------------------
-API_KEY = st.secrets.get("TMDB_API_KEY") or os.getenv("TMDB_API_KEY")
+# Buscador
+movie_name = st.selectbox(
+    "🔎 Buscar película",
+    df_peliculas['titulo'].sort_values(),
+    index=None,
+    placeholder="Escribe para buscar..."
+)
 
-if not API_KEY:
-    st.error("⚠️ Falta configurar TMDB API KEY")
-    st.stop()
+# Géneros
+generos = df_peliculas.columns[2:]
 
-# -------------------------------
-# 🎬 POSTER
-# -------------------------------
-def get_poster(title):
-    try:
-        title = title.split('(')[0]
-        url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={title}"
-        data = requests.get(url).json()
+genero_select = st.selectbox(
+    "🎭 Filtrar por género",
+    ["Todos"] + list(generos)
+)
 
-        if data.get("results"):
-            poster = data["results"][0].get("poster_path")
-            if poster:
-                return f"https://image.tmdb.org/t/p/w500{poster}"
-    except:
-        return None
-    return None
+# ---------------- BOTON ----------------
+if st.button("🚀 Recomendar"):
 
-# -------------------------------
-# 📂 DATA
-# -------------------------------
-@st.cache_data
-def load_data():
-    df_movies = pd.read_csv(
-        "data/u.item",
-        sep="|",
-        encoding="latin-1",
-        header=None
-    )
+    if movie_name:
 
-    df_movies = df_movies[[0,1] + list(range(5,24))]
-    df_movies.columns = ['movie_id','title'] + [
-        'unknown','Action','Adventure','Animation','Childrens','Comedy',
-        'Crime','Documentary','Drama','Fantasy','Film-Noir','Horror',
-        'Musical','Mystery','Romance','Sci-Fi','Thriller','War','Western'
-    ]
+        movie_id = df_peliculas[
+            df_peliculas['titulo'] == movie_name
+        ]['movie_id'].values[0]
 
-    genres = df_movies.columns[2:]
+        recs = recomendar(movie_id)
 
-    return df_movies, genres
+        st.subheader("🔥 Recomendaciones")
 
-df_movies, genres = load_data()
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
 
-# -------------------------------
-# 🧠 MODELO (CONTENIDO)
-# -------------------------------
-@st.cache_data
-def build_similarity(df_movies, genres):
+        for movie_id_rec in recs:
 
-    df_movies['genres_str'] = df_movies.apply(
-        lambda x: ' '.join([g for g in genres if x[g]==1]), axis=1
-    )
+            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
+            titulo = row['titulo']
 
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
+            if genero_select != "Todos":
+                if row[genero_select] != 1:
+                    continue
 
-    tfidf = TfidfVectorizer()
-    tfidf_matrix = tfidf.fit_transform(df_movies['genres_str'])
+            data = get_movie_data(titulo)
 
-    sim = cosine_similarity(tfidf_matrix)
+            poster = data["poster"] if data else ""
+            overview = data["overview"][:120] if data else ""
 
-    return sim
+            st.markdown(f"""
+            <div class="movie-card">
+                <img src="{poster}" class="movie-img"/>
+                <div class="movie-overlay">
+                    <div class="movie-title">{titulo}</div>
+                    <div class="movie-desc">{overview}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-similarity = build_similarity(df_movies, genres)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# 🔍 BUSCADOR
-# -------------------------------
-search = st.text_input("🔎 Buscar película")
-
-# 🎭 FILTRO
-genre_selected = st.selectbox("🎭 Género", ["Todos"] + list(genres))
-
-filtered = df_movies.copy()
-
-if genre_selected != "Todos":
-    filtered = filtered[filtered[genre_selected] == 1]
-
-if search:
-    filtered = filtered[filtered['title'].str.contains(search, case=False)]
-
-st.write(f"🎬 {len(filtered)} películas encontradas")
-
-# -------------------------------
-# 🎬 RECOMENDAR
-# -------------------------------
-def recommend(title, n=15):
-
-    idx = df_movies[df_movies['title'] == title].index[0]
-    scores = list(enumerate(similarity[idx]))
-    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:n+1]
-
-    movie_indices = [i[0] for i in scores]
-    return df_movies.iloc[movie_indices]
-
-# -------------------------------
-# UI GRID
-# -------------------------------
-cols = st.columns(5)
-
-for i, row in filtered.head(20).iterrows():
-
-    col = cols[i % 5]
-    poster = get_poster(row['title'])
-
-    with col:
-        if poster:
-            st.image(poster, use_container_width=True)
-        else:
-            st.markdown("<div class='no-image'>🎬</div>", unsafe_allow_html=True)
-
-        if st.button(f"Ver similares {i}"):
-            recs = recommend(row['title'])
-
-            st.subheader(f"🔥 Porque viste {row['title']}")
-
-            rec_cols = st.columns(5)
-
-            for j, rec in recs.iterrows():
-                poster2 = get_poster(rec['title'])
-                col2 = rec_cols[j % 5]
-
-                with col2:
-                    if poster2:
-                        st.image(poster2, use_container_width=True)
-                    else:
-                        st.markdown("<div class='no-image'>🎬</div>", unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ Selecciona una película")
+```
