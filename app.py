@@ -57,18 +57,16 @@ def get_movie_full_details(title):
             movie_data = res["results"][0]
             m_id = movie_data["id"]
             
-            # Intentar obtener detalles y videos en ESPAÑOL
+            # Detalle extendido: videos y créditos
             detail_url = f"https://api.themoviedb.org/3/movie/{m_id}?api_key={API_KEY}&append_to_response=videos,credits&language=es-ES"
             details = requests.get(detail_url).json()
             
+            # Lógica de Tráiler con Respaldo en Inglés
             trailer_url = None
             videos = details.get("videos", {}).get("results", [])
-            
-            # Si no hay videos en español, intentamos en INGLÉS (respaldo)
             if not videos:
                 detail_url_en = f"https://api.themoviedb.org/3/movie/{m_id}?api_key={API_KEY}&append_to_response=videos&language=en-US"
-                details_en = requests.get(detail_url_en).json()
-                videos = details_en.get("videos", {}).get("results", [])
+                videos = requests.get(detail_url_en).json().get("videos", {}).get("results", [])
 
             for v in videos:
                 if v["site"] == "YouTube" and v["type"] in ["Trailer", "Teaser"]:
@@ -113,15 +111,11 @@ def mostrar_detalles(info, titulo):
         st.write(f"**👥 Reparto:** {info['actores']}")
         st.write("---")
         st.write("**Sinopsis:**")
-        st.write(info['overview'])
-        
-        # EL TRÁILER SE MUESTRA AQUÍ:
+        st.write(info['overview']) # Aquí restauramos la sinopsis en el modal
         if info['trailer']:
             st.write("---")
             st.write("**🎥 Tráiler Oficial:**")
             st.video(info['trailer'])
-        else:
-            st.info("Tráiler no disponible para esta película.")
 
 # ---------------- CSS ESTILO NETFLIX ----------------
 st.markdown("""
@@ -166,6 +160,15 @@ st.markdown("""
     font-size: 14px;
     font-weight: 700;
 }
+.movie-desc-card {
+    color: #ccc;
+    font-size: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 5px;
+}
 div.stButton > button {
     background-color: #333;
     color: white;
@@ -199,10 +202,6 @@ if st.button("🚀 Recomendar"):
         if not selected_row.empty:
             m_id = selected_row['movie_id'].values[0]
             st.session_state.recs_df = recomendar(m_id)
-        else:
-            st.error("Película no encontrada.")
-    elif similitud is None:
-        st.error("Modelos no cargados.")
 
 if st.session_state.recs_df is not None:
     st.subheader(f"🔥 Recomendaciones")
@@ -216,12 +215,14 @@ if st.session_state.recs_df is not None:
         info = get_movie_full_details(row['titulo'])
         if info:
             with cols[idx_col % 5]:
+                # Card con efecto HOVER y DESCRIPCIÓN breve
                 st.markdown(f"""
                 <div class="movie-container">
                     <img src="{info['poster']}" class="movie-img"/>
                     <div class="movie-overlay">
                         <div class="movie-title-card">{row['titulo'][:30]}</div>
                         <div class="movie-score" style="color:#FFD700">★ {round(info['rating']/2,1)}</div>
+                        <div class="movie-desc-card">{info['overview']}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
