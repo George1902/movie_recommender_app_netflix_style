@@ -149,54 +149,53 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
-# ---------------- BOTON ----------------
+def recomendar(movie_id, top_n=15):
+    idx = indices[movie_id]
+    scores = list(enumerate(similitud[idx]))
+    # Guardamos el score (distancia de similitud)
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+    
+    movie_indices = [i[0] for i in scores]
+    movie_scores = [i[1] for i in scores] # Extraemos los valores de similitud
+    
+    recs = df_peliculas.iloc[movie_indices].copy()
+    recs['similarity_score'] = movie_scores
+    return recs
+
+# ---------------- DENTRO DEL BOTON RECOMENDAR ----------------
 if st.button("🚀 Recomendar"):
     if movie_name:
-        # 1. Obtener ID de la película seleccionada
         movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
         movie_id = movie_selected['movie_id'].values[0]
 
-        # 2. Obtener recomendaciones
-        rec_ids = recomendar(movie_id)
+        df_recs = recomendar(movie_id) # Ahora devuelve un DataFrame con scores
 
         st.subheader("🔥 Recomendaciones")
         
-        # 3. CREAR COLUMNAS (Importante para evitar el error de 'cols')
         cols = st.columns(5) 
-        
-        # Contador para distribuir en las 5 columnas
         idx_col = 0 
 
-        for movie_id_rec in rec_ids:
-            row = df_peliculas[df_peliculas['movie_id'] == movie_id_rec].iloc[0]
+        for _, row in df_recs.iterrows():
             titulo = row['titulo']
+            score = row['similarity_score'] * 100 # Convertimos a porcentaje
 
-            # Filtro de género
             if genero_select != "Todos":
                 if row[genero_select] != 1:
                     continue
 
             poster = get_poster(titulo)
             
-            # Seleccionar la columna actual
             with cols[idx_col % 5]:
-                if poster:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <img src="{poster}" class="movie-img"/>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                        </div>
+                # Ahora usamos la variable 'score' que antes daba error
+                content = f"""
+                <div class="movie-container">
+                    {f'<img src="{poster}" class="movie-img"/>' if poster else '<div class="no-image">🎬</div>'}
+                    <div class="movie-overlay">
+                        <div class="movie-title">{titulo[:30]}</div>
+                        <div class="movie-score">⭐ {int(score)}% match</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <div class="no-image">🎬</div>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                </div>
+                """
+                st.markdown(content, unsafe_allow_html=True)
             
-            idx_col += 1 # Incrementar solo si la película pasó el filtro
+            idx_col += 1
