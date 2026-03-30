@@ -171,22 +171,30 @@ if st.button("🚀 Recomendar"):
                 if row[genero_select] != 1:
                     continue
 
-            data =  get_poster(title):
+           poster = get_poster(titulo)
 
-            poster = data["poster"] if data else ""
-            overview = data["overview"][:120] if data else ""
+        col = cols[i % 5]
 
-            st.markdown(f"""
-            <div class="movie-card">
-                <img src="{poster}" class="movie-img"/>
-                <div class="movie-overlay">
-                    <div class="movie-title">{titulo}</div>
-                    <div class="movie-desc">{overview}</div>
+        with col:
+
+            if poster:
+                st.markdown(f"""
+                <div class="movie-container">
+                    <img src="{poster}" class="movie-img"/>
+                    <div class="movie-overlay">
+                        <div class="movie-title">{titulo[:30]}</div>
+                        <div class="movie-score">⭐ {round(score,2)}</div>
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    else:
-        st.warning("⚠️ Selecciona una película")
+            else:
+                st.markdown(f"""
+                <div class="movie-container">
+                    <div class="no-image">🎬</div>
+                    <div class="movie-overlay">
+                        <div class="movie-title">{titulo[:30]}</div>
+                        <div class="movie-score">⭐ {round(score,2)}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
