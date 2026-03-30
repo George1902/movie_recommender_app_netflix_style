@@ -171,7 +171,7 @@ if st.button("🚀 Recomendar"):
                 if row[genero_select] != 1:
                     continue
 
-        poster = get_poster(title)
+        poster = get_poster(titulo)
 
         col = cols[i % 5]
 
