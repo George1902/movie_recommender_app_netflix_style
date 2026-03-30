@@ -149,66 +149,74 @@ genero_select = st.selectbox(
 )
 
 # ---------------- BOTON ----------------
-
 if st.button("🚀 Recomendar"):
-
     if movie_name:
-        # 1. Obtener ID de la película seleccionada
+        # 1. Obtener ID de la seleccionada
         movie_selected = df_peliculas[df_peliculas['titulo'] == movie_name]
-        movie_id = movie_selected['movie_id'].values[0]
-
-        # 2. Obtener recomendaciones (Asegúrate de que se llame rec_ids)
-        rec_ids = recomendar(movie_id)
-
-        st.subheader("🔥 Recomendaciones")
         
-        # 3. Crear columnas
-        cols = st.columns(5) 
-        
-        # Contador para distribuir en las 5 columnas
-        idx_col = 0 
+        if movie_selected.empty:
+            st.error("No se encontró la película seleccionada en el dataset.")
+        else:
+            movie_id = movie_selected['movie_id'].values[0]
 
-        # 4. Bucle principal (Aquí es donde daba el NameError)
-        for movie_id_rec in rec_ids:
-            
-            # Buscamos la película de forma segura
-            datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
-            
-            if datos_pelicula.empty:
-                continue
+            # 2. Obtener recomendaciones
+            rec_ids = recomendar(movie_id)
+
+            if len(rec_ids) == 0:
+                st.warning("El modelo no devolvió recomendaciones.")
+            else:
+                st.subheader("🔥 Recomendaciones")
                 
-            row = datos_pelicula.iloc[0]
-            titulo = row['titulo']
+                # 3. Crear columnas
+                cols = st.columns(5) 
+                idx_col = 0 
 
-            # Filtro de género
-            if genero_select != "Todos":
-                if row[genero_select] != 1:
-                    continue
+                # 4. Bucle principal
+                for movie_id_rec in rec_ids:
+                    
+                    # Buscamos la película en el CSV
+                    datos_pelicula = df_peliculas[df_peliculas['movie_id'] == movie_id_rec]
+                    
+                    if datos_pelicula.empty:
+                        continue
+                        
+                    row = datos_pelicula.iloc[0]
+                    titulo = row['titulo']
 
-            # Obtener poster y rating de la función que definimos antes
-            # Si aún usas 'get_poster', cámbialo aquí o usa la versión con rating
-            poster, rating = get_movie_details(titulo) 
-            
-            with cols[idx_col % 5]:
-                if poster:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <img src="{poster}" class="movie-img"/>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                            <div class="movie-score">⭐ {round(rating, 1)}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="movie-container">
-                        <div class="no-image">🎬</div>
-                        <div class="movie-overlay">
-                            <div class="movie-title">{titulo[:30]}</div>
-                            <div class="movie-score">⭐ {round(rating, 1)}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            idx_col += 1
+                    # --- FILTRO DE GÉNERO ---
+                    if genero_select != "Todos":
+                        if row[genero_select] != 1:
+                            continue  # Salta si no es del género seleccionado
+
+                    # 5. Obtener poster y rating
+                    # IMPORTANTE: Asegúrate de tener definida la función get_movie_details
+                    poster, rating = get_movie_details(titulo) 
+                    
+                    # 6. Dibujar en la columna
+                    with cols[idx_col % 5]:
+                        if poster:
+                            st.markdown(f"""
+                            <div class="movie-container">
+                                <img src="{poster}" class="movie-img"/>
+                                <div class="movie-overlay">
+                                    <div class="movie-title">{titulo[:30]}</div>
+                                    <div class="movie-score">⭐ {round(rating, 1)}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                            <div class="movie-container">
+                                <div class="no-image">🎬</div>
+                                <div class="movie-overlay">
+                                    <div class="movie-title">{titulo[:30]}</div>
+                                    <div class="movie-score">⭐ {round(rating, 1)}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    idx_col += 1
+
+                # Si después de todo el bucle no se mostró nada
+                if idx_col == 0:
+                    st.info(f"No hay recomendaciones de tipo '{genero_select}' para esta película.")
